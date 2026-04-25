@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pie Clock - Interview Timer Component</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --red: #be161b;
+      --panel: #141414;
+      --surface: #1c1c1c;
+      --border: #2a2a2a;
+      --text: #e8e8e8;
+      --muted: #666;
+      --white: #fff;
+      --green: #4ade80;
+      --yellow: #facc15;
+      --blue: #3b82f6;
+      --ease: cubic-bezier(.4,0,.2,1);
+      --spring: cubic-bezier(.34,1.56,.64,1);
+    }
+
+    body {
+      background: var(--panel);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Arial', sans-serif;
+      font-size: 24px;
+      font-weight: 900;
+      margin-bottom: 30px;
+      color: var(--white);
+    }
+
+    /* ══ PIE CLOCK ════════════════════════════════════════ */
+    .pie-clock-wrap {
+      position: relative;
+      width: 130px;
+      height: 130px;
+      flex-shrink: 0;
+      overflow: visible;
+      margin: 0 auto;
+    }
+
+    #pie-clock-canvas {
+      width: 130px !important;
+      height: 130px !important;
+    }
+
+    .pie-clock-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .pie-clock-time {
+      font-family: 'Arial', sans-serif;
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--white);
+      line-height: 1;
+    }
+
+    .pie-clock-label {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .pie-clock-markers {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      pointer-events: auto;
+    }
+
+    .pie-clock-tooltip {
+      position: absolute;
+      z-index: 50;
+      display: none;
+      width: 200px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.55);
+      pointer-events: none;
+      transform: translate(-50%, -110%);
+    }
+
+    .pie-clock-tooltip.open {
+      display: block;
+      animation: moIn .12s var(--ease);
+    }
+
+    @keyframes moIn {
+      from { opacity: 0 }
+      to { opacity: 1 }
+    }
+
+    .pie-marker {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #3b82f6;
+      border: 1.5px solid #fff;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      z-index: 7;
+      opacity: .9;
+      transition: transform .12s var(--spring), box-shadow .12s var(--spring), background .12s var(--spring);
+    }
+
+    .pie-marker:hover {
+      transform: translate(-50%, -50%) scale(1.28);
+      box-shadow: 0 0 16px rgba(59,130,246,.65);
+    }
+
+    .pie-marker.selected {
+      background: var(--red);
+      box-shadow: 0 0 18px rgba(190,22,27,.92);
+    }
+
+    .pie-marker.state-upcoming {
+      background: #3b82f6;
+    }
+
+    .pie-marker.state-now {
+      background: #4ade80;
+    }
+
+    .pie-marker.state-past {
+      background: #555;
+      opacity: .45;
+    }
+
+    #pie-status {
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      max-width: 130px;
+      line-height: 1.4;
+      margin-top: 10px;
+    }
+
+    .controls {
+      margin-top: 30px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 8px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--white);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all .2s;
+    }
+
+    button:hover {
+      border-color: var(--red);
+      background: rgba(190,22,27,.1);
+    }
+
+    .info {
+      margin-top: 30px;
+      font-size: 12px;
+      color: var(--muted);
+      max-width: 400px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🕐 Pie Clock Component</h1>
+    
+    <!-- Pie Clock -->
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+      <div class="pie-clock-wrap">
+        <canvas id="pie-clock-canvas"></canvas>
+        <div id="pie-clock-markers" class="pie-clock-markers"></div>
+        <div id="pie-clock-tooltip" class="pie-clock-tooltip"></div>
+        <div class="pie-clock-center">
+          <div class="pie-clock-time" id="pie-time">--:--</div>
+          <div class="pie-clock-label" id="pie-label">TERMIN</div>
+        </div>
+      </div>
+      <div id="pie-status"></div>
+    </div>
+
+    <div class="controls">
+      <button onclick="updatePieClock('09:00')">Set 09:00</button>
+      <button onclick="updatePieClock('10:30')">Set 10:30</button>
+      <button onclick="updatePieClock('14:00')">Set 14:00</button>
+      <button onclick="updatePieClock(null)">Clear</button>
+    </div>
+
+    <div class="info">
+      <strong>Features:</strong><br>
+      • Visual countdown to interview time<br>
+      • Color-coded urgency (red/yellow/blue/green)<br>
+      • Interactive markers for scheduled interviews<br>
+      • Real-time clock mode when no target time set<br>
+      • Hover tooltips with candidate details
+    </div>
+  </div>
+
+  <script>
+    // ══ PIE CLOCK ══════════════════════════════════════════
+    var pieClockChart = null;
+    var pieClockTimer = null;
+    var pieTargetTime = null; // {h,m} today
+    var pieTermsCache = []; // cached interview terms
+
+    function gs(id) {
+      return document.getElementById(id);
+    }
+
+    function initPieClock() {
+      var canvas = gs('pie-clock-canvas');
+      if (!canvas) return;
+      if (pieClockChart) {
+        pieClockChart.destroy();
+        pieClockChart = null;
+      }
+      if (pieClockTimer) {
+        clearInterval(pieClockTimer);
+      }
+
+      pieClockChart = new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          datasets: [{
+            data: [0, 100],
+            backgroundColor: ['#be161b', '#1c1c1c'],
+            borderWidth: 0,
+            hoverOffset: 0
+          }]
+        },
+        options: {
+          responsive: false,
+          cutout: '72%',
+          animation: {
+            duration: 600,
+            easing: 'easeInOutQuart'
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              enabled: false
+            }
+          }
+        }
+      });
+
+      // Tick every 30s
+      tickPieClock();
+      pieClockTimer = setInterval(tickPieClock, 30000);
+    }
+
+    function parseHHMM(str) {
+      if (!str && str !== 0) return null;
+      var m = (str.toString().trim()).match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return null;
+      var hh = parseInt(m[1], 10),
+        mm = parseInt(m[2], 10);
+      if (isNaN(hh) || isNaN(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+      return hh * 60 + mm;
+    }
+
+    function formatHHMM(h, m) {
+      return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+    }
+
+    function highlightPieMarkerByTime(vreme) {
+      var cont = gs('pie-clock-markers');
+      if (!cont) return;
+      var sel = vreme;
+      cont.querySelectorAll('.pie-marker').forEach(function(el) {
+        if (el.dataset.time === sel) el.classList.add('selected');
+        else el.classList.remove('selected');
+      });
+    }
+
+    function hidePieTooltip() {
+      var tip = gs('pie-clock-tooltip');
+      if (tip) tip.classList.remove('open');
+    }
+
+    function showPieTooltip(evt, term) {
+      var tip = gs('pie-clock-tooltip');
+      if (!tip) return;
+      var marker = evt.currentTarget;
+      var wrap = marker.closest('.pie-clock-wrap') || (gs('pie-clock-canvas') ? gs('pie-clock-canvas').parentElement : null);
+      if (!wrap) return;
+      var wrapRect = wrap.getBoundingClientRect();
+      var mRect = marker.getBoundingClientRect();
+      var x = (mRect.left - wrapRect.left) + (mRect.width / 2);
+      var y = (mRect.top - wrapRect.top) + (mRect.height / 2);
+
+      var ime = term.ime || '—';
+      var vreme = term.zakazanVreme || '—';
+      var poz = term.pozicija || 'PRODAVAC';
+      var izvor = term.izvor || 'Baza';
+      var kontakt = term.kontakt || '';
+
+      tip.innerHTML =
+        '<div style="font-weight:900;color:var(--white);font-size:14px;line-height:1.2;">' + ime + '</div>' +
+        '<div style="color:var(--muted);font-size:12px;margin-top:6px;">⏱ ' + vreme + '</div>' +
+        '<div style="color:var(--muted);font-size:12px;margin-top:4px;">' + poz + '</div>' +
+        '<div style="color:var(--muted);font-size:12px;margin-top:2px;">Izvor: ' + izvor + '</div>' +
+        (kontakt ? '<div style="color:var(--muted);font-size:12px;margin-top:2px;">Kontakt: ' + kontakt + '</div>' : '');
+
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+      tip.classList.add('open');
+    }
+
+    function updatePieMarkersNow(curMin) {
+      var cont = gs('pie-clock-markers');
+      if (!cont) return;
+      var markers = cont.querySelectorAll('.pie-marker');
+      markers.forEach(function(el) {
+        var mins = parseHHMM(el.dataset.time);
+        if (mins === null) return;
+        var diff = mins - curMin;
+        el.classList.remove('state-upcoming', 'state-now', 'state-past', 'selected');
+        if (diff > 0) el.classList.add('state-upcoming');
+        else if (diff > -30) el.classList.add('state-now');
+        else el.classList.add('state-past');
+      });
+      if (pieTargetTime) {
+        highlightPieMarkerByTime(formatHHMM(pieTargetTime.h, pieTargetTime.m));
+      }
+    }
+
+    function renderPieMarkers(terms) {
+      pieTermsCache = (terms || []).slice();
+      var canvas = gs('pie-clock-canvas');
+      var cont = gs('pie-clock-markers');
+      if (!canvas || !cont) return;
+      cont.innerHTML = '';
+
+      var rect = canvas.getBoundingClientRect();
+      var size = Math.min(rect.width, rect.height);
+      var cx = size / 2,
+        cy = size / 2;
+      var r = size * 0.42;
+
+      // Group by same time to avoid overlap
+      var groups = {};
+      (terms || []).forEach(function(t) {
+        if (!t || !t.zakazanVreme) return;
+        if (parseHHMM(t.zakazanVreme) === null) return;
+        var key = t.zakazanVreme;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(t);
+      });
+
+      var keys = Object.keys(groups).sort();
+      keys.forEach(function(key) {
+        var arr = groups[key] || [];
+        var mins = parseHHMM(key);
+        if (mins === null) return;
+        var baseAngle = mins / 1440 * 2 * Math.PI - Math.PI / 2; // 00:00 at top
+        arr.forEach(function(term, idx) {
+          var a = baseAngle + (arr.length > 1 ? (idx - (arr.length - 1) / 2) * 0.07 : 0);
+          var rr = r + idx * 3;
+          var x = cx + rr * Math.cos(a);
+          var y = cy + rr * Math.sin(a);
+          var el = document.createElement('div');
+          el.className = 'pie-marker';
+          el.style.left = x + 'px';
+          el.style.top = y + 'px';
+          el.dataset.time = key;
+          el.dataset.ime = term.ime || '';
+          el.addEventListener('mouseenter', function(evt) {
+            showPieTooltip(evt, term);
+          });
+          el.addEventListener('mouseleave', hidePieTooltip);
+          el.addEventListener('click', function(evt) {
+            evt.stopPropagation();
+            hidePieTooltip();
+          });
+          cont.appendChild(el);
+        });
+      });
+
+      var now = new Date();
+      var curMin = now.getHours() * 60 + now.getMinutes();
+      updatePieMarkersNow(curMin);
+    }
+
+    function updatePieClock(vreme) {
+      // vreme = "HH:MM"
+      if (!vreme) {
+        pieTargetTime = null;
+        if (gs('pie-time')) gs('pie-time').textContent = '--:--';
+        if (gs('pie-label')) gs('pie-label').textContent = 'TERMIN';
+        hidePieTooltip();
+        tickPieClock();
+        return;
+      }
+      var p = vreme.split(':');
+      if (p.length < 2) return;
+      var hh = parseInt(p[0], 10),
+        mm = parseInt(p[1], 10);
+      if (isNaN(hh) || isNaN(mm)) return;
+      pieTargetTime = {
+        h: hh,
+        m: mm
+      };
+      var sel = formatHHMM(hh, mm);
+      if (gs('pie-time')) gs('pie-time').textContent = sel;
+      if (gs('pie-label')) gs('pie-label').textContent = 'TERMIN';
+      highlightPieMarkerByTime(sel);
+      tickPieClock();
+    }
+
+    function tickPieClock() {
+      if (!pieClockChart) return;
+      var now = new Date();
+      var curMin = now.getHours() * 60 + now.getMinutes();
+      var timeEl = gs('pie-time');
+      var labelEl = gs('pie-label');
+      var statusEl = gs('pie-status');
+
+      if (!pieTargetTime) {
+        // Show current time
+        var hh = now.getHours(),
+          mm = now.getMinutes();
+        if (timeEl) timeEl.textContent = (hh < 10 ? '0' + hh : hh) + ':' + (mm < 10 ? '0' + mm : mm);
+        if (labelEl) labelEl.textContent = 'SADA';
+        // Percentage of day
+        var dayPct = Math.round(curMin / 1440 * 100);
+        pieClockChart.data.datasets[0].data = [dayPct, 100 - dayPct];
+        pieClockChart.data.datasets[0].backgroundColor = ['#333', '#1c1c1c'];
+        pieClockChart.update();
+        updatePieMarkersNow(curMin);
+        return;
+      }
+
+      var targetMin = pieTargetTime.h * 60 + pieTargetTime.m;
+      var diff = targetMin - curMin; // Minutes to appointment
+
+      var color, pct, statusTxt;
+      if (diff > 0) {
+        // Remaining time shows percentage of workday (7:00-20:00 = 780min)
+        pct = Math.max(0, Math.min(100, Math.round((1 - diff / 480) * 100)));
+        if (diff <= 15) {
+          color = '#f87171';
+          statusTxt = '⚡ Za ' + diff + ' min!';
+        } else if (diff <= 60) {
+          color = '#facc15';
+          statusTxt = '⏳ Za ' + diff + ' min';
+        } else {
+          color = '#3b82f6';
+          statusTxt = 'Za ' + Math.floor(diff / 60) + 'h ' + (diff % 60) + 'min';
+        }
+      } else if (diff > -30) {
+        color = '#4ade80';
+        pct = 100;
+        statusTxt = '🟢 Kandidat treba da je tu';
+      } else {
+        color = '#555';
+        pct = 0;
+        statusTxt = 'Termin prošao';
+        pieTargetTime = null;
+        if (timeEl) timeEl.textContent = '--:--';
+        if (labelEl) labelEl.textContent = 'TERMIN';
+      }
+      pieClockChart.data.datasets[0].data = [pct, 100 - pct];
+      pieClockChart.data.datasets[0].backgroundColor = [color, '#1c1c1c'];
+      pieClockChart.update();
+      if (statusEl) statusEl.textContent = statusTxt || '';
+      updatePieMarkersNow(curMin);
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', function() {
+      initPieClock();
+      
+      // Demo: Add some sample markers
+      var demoTerms = [
+        { ime: 'Marko Petrović', zakazanVreme: '09:00', pozicija: 'PRODAVAC', izvor: 'Infostud', kontakt: '060 123 4567' },
+        { ime: 'Ana Jovanović', zakazanVreme: '10:30', pozicija: 'PRODAVAC', izvor: 'Sajt', kontakt: '064 987 6543' },
+        { ime: 'Ivan Nikolić', zakazanVreme: '14:00', pozicija: 'MENADŽER', izvor: 'Preporuka', kontakt: '' }
+      ];
+      renderPieMarkers(demoTerms);
+    });
+  </script>
+</body>
+</html>
